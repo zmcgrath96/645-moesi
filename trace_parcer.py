@@ -3,7 +3,7 @@ import os
 '''
 Description:
 	Given the trace file, read it in, make a tuple of
-	(pid, timestamp, read/write(1/0), mem_address (converted to binary))
+	(pid, timestamp, read/write(1/0), tag (int), index(int), offset(int))
 
 Parameters:
 	filename: string
@@ -21,7 +21,11 @@ def parse(filename, pid, bit_length=32):
 		for l in f:
 			line = l.split(' ')
 			b = bin(int(line[2], base=16))[2:].zfill(bit_length)
-			t = (pid, int(line[0]), int(line[1]), b)
+			# split the binary number into tag, index, offset
+			offset = int(b[27:], 2)
+			index = int(b[18:27], 2)
+			tag = int(b[0:18], 2)
+			t = (pid, int(line[0]), int(line[1]), tag, index, offset)
 			trace.append(t)
 
 	return trace
