@@ -7,6 +7,8 @@ class processor():
     def __init__(self, id):
         self.cache = [('i', 0) for x in range(512)]
         self.p_id = id
+        self.dirty_wbs = 0
+        self.invalids = [0,0,0,0,0]
         
     def execute(self, rw, tag, index, offset): ##Focuses on PR and PW, returns bus_action
         ret = None
@@ -62,8 +64,69 @@ class processor():
             pass
         pass
 
-    def change_state_bus(self, bus_sig, flush, address): ##Handles the bus tranactions, returns 
-        pass
+    def change_state_bus(self, bus_sig, index, address): ##Handles the bus tranactions, DOES THIS NEED THE ADDRESS and if so FOR WHAT
+        state = self.cache[index][0]
+        flush = False
+        
+        if 'm' in state: ##MODIFIED STATE
+            if bus_sig == "BusRd":
+                flush = True
+                self.cache[index] = ('o', self.cache[index][1])
+
+            elif bus_sig == "BusRdX":
+                flush = True
+                self.cache[index] = ('i', self.cache[index][1])
+
+        elif 'o' in state: ##OWNER CASE
+            if bus_sig == "BusRd":
+                flush = True
+
+            elif bus_sig == "BusRdX":
+                flush = True
+                self.cache[index] = ('i', self.cache[index][1])
+
+            elif bus_sig == "BusUpgr":
+                flush = False
+                self.cache[index] = ('i', self.cache[index][1])
+        
+        elif 'e' in state: ##EXCLUSIVE CASE
+            if bus_sig == "BusRd":
+                flush = True
+                self.cache[index] = ('s', self.cache[index][1])
+
+            elif bus_sig == "BusRdX":
+                flush = True
+                self.cache[index] = ('i', self.cache[index][1])
+
+        elif 's' in state: ##SHARED CASE
+            if bus_sig == "BusRdX" or bus_sig == "BusUpgr":
+                flush = False
+                self.cache[index] = ('i', self.cache[index][1])
+        
+        else: ##INVALID CASE
+            ##Has to check if other processors are in S or not
+
 
     def count_states(self):
-        pass
+        ##Counts the total number of each state and puts them on the list
+        state_list = [0, 0, 0, 0, 0]
+
+        for x in self.cache:
+            (s, num) = x
+
+            if s == 'm': ##m state at index 0
+                state_list[0] = state_list[0]+1
+
+            elif s == 'o': ## o state at index 1
+                state_list[1] = state_list[1]+1
+
+            elif s == 'e': ## e state at index 2
+                state_list[2] = state_list[2]+1
+
+            elif s == 's': ##s state at index 3
+                state_list[3] = state_list[3]+1
+
+            else: ##i state at index 4
+                state_list[4] = state_list[4]+1
+
+        return state_list
