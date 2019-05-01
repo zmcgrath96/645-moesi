@@ -105,7 +105,9 @@ class processor():
         
         else: ##INVALID CASE
             ##Has to check if other processors are in S or not
-
+            pass
+        
+        return flush
 
     def count_states(self):
         ##Counts the total number of each state and puts them on the list
