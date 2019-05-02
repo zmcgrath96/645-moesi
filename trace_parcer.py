@@ -22,8 +22,11 @@ def parse(filename, pid, bit_length=32):
 			line = l.split(' ')
 			b = bin(int(line[2], base=16))[2:].zfill(bit_length)
 			# split the binary number into tag, index, offset
+			# 5 bit offset
 			offset = int(b[27:], 2)
+			# 9 bit index
 			index = int(b[18:27], 2)
+			# 18 bit tag
 			tag = int(b[0:18], 2)
 			t = (pid, int(line[0]), int(line[1]), tag, index, offset)
 			trace.append(t)

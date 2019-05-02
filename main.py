@@ -2,6 +2,10 @@ import sys
 from trace_parcer import parse
 from processor import processor
 
+INPUT_FOLDER = 'traces/'
+QUICK_FILE_PARAMS = [INPUT_FOLDER + 'p0.tr', INPUT_FOLDER + 'p1.tr', INPUT_FOLDER + 'p2.tr', INPUT_FOLDER + 'p3.tr']
+INTERACTIVE_PARAMS = ['-i'] + QUICK_FILE_PARAMS
+
 '''
 Description:
 	intro file into this project
@@ -14,6 +18,14 @@ Returns:
 	none
 '''
 def main(args):
+	INTERACTIVE = False
+	if '-i' in args[0]:
+		args = args[1:]
+		INTERACTIVE = True
+
+	elif '-q' in args[0]:
+		args = args[1:]
+
 	pid_0 = 'p0'
 	pid_1 = 'p1'
 	pid_2 = 'p2'
@@ -35,12 +47,27 @@ def main(args):
 	all_traces.sort(key = lambda t: (t[1], t[0]))
 
 	# each cycle has the form (pid, timestamp, read/write(1/0), tag (int), index(int), offset(int))
+	clean_bus = True
 	for cycle in all_traces:
+		if INTERACTIVE:
+			input('Enter for next cycle')
 		c_pid, _, io, c_tag, c_index, c_offset = cycle
 		bus_action = ps[c_pid].execute(io, c_tag, c_index, c_offset)
+		states = get_states(ps, c_index, c_tag)
+
+def get_states(ps, index, tag):
+	states = {}
+	for p in ps:
+		states[p] = ps[p].get_state(index, tag)
+	return states
+
+
 
 if __name__ == '__main__':
 	if len(sys.argv[1:]) < 4:
-		print('Invalid input. Call to main.py should be of the form:')
-		print('python3 main.py p0_trace p1_trace p2_trace p3_trace')
+		if len(sys.argv) == 2:
+			main(INTERACTIVE_PARAMS)
+		else:
+			print('Invalid input. Call to main.py should be of the form:')
+			print('python3 main.py p0_trace p1_trace p2_trace p3_trace')
 	main(sys.argv[1:])

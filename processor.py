@@ -75,6 +75,7 @@ class processor():
 
             elif bus_sig == "BusRdX":
                 flush = True
+                self.dirty_wbs += 1
                 self.cache[index] = ('i', self.cache[index][1])
 
         elif 'o' in state: ##OWNER CASE
@@ -83,10 +84,12 @@ class processor():
 
             elif bus_sig == "BusRdX":
                 flush = True
+                self.dirty_wbs += 1
                 self.cache[index] = ('i', self.cache[index][1])
 
             elif bus_sig == "BusUpgr":
                 flush = False
+                self.dirty_wbs += 1
                 self.cache[index] = ('i', self.cache[index][1])
         
         elif 'e' in state: ##EXCLUSIVE CASE
@@ -132,3 +135,8 @@ class processor():
                 state_list[4] = state_list[4]+1
 
         return state_list
+
+    def get_state(self, index, tag):
+        if self.cache[index][1] == tag:
+            return self.cache[index][0]
+        return 'i'
