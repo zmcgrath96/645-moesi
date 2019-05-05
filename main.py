@@ -12,7 +12,7 @@ Description:
 
 Parameters:
 	Takes in the 4 filenames for the processor traces
-	ex: python3 main.py p0_trace p1_trace p2_trace p3_trace 
+	ex: python3 main.py p0_trace p1_trace p2_trace p3_trace
 
 Returns:
 	none
@@ -54,6 +54,15 @@ def main(args):
 		c_pid, _, io, c_tag, c_index, c_offset = cycle
 		bus_action = ps[c_pid].execute(io, c_tag, c_index, c_offset)
 		states = get_states(ps, c_index, c_tag)
+
+		shared = False
+		for p_id, state in states:
+			if state == 's' and ps[c_pid].state == 'i':
+				ps[c_pid].state = 's'
+				shared = True
+
+		if not shared and ps[c_pid] == 'i':
+			ps[c_pid].state = 'e'
 
 def get_states(ps, index, tag):
 	states = {}
