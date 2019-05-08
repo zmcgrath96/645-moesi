@@ -92,9 +92,15 @@ def main(args):
 		if  bus_action == bus_states['r']:
 			if shared:
 				ps[get_from_pid].change_state_bus(bus_action, c_index, c_tag)
-		#busupgr or busrdx
-		else:
+		#busupgr
+		elif bus_action == bus_states['u']:
 			invalidate_all(ps, c_index, c_tag, c_pid)
+			
+		#busrdx
+		else:
+			for pid in ps:
+				if pid != c_pid:
+					ps[pid].change_state_bus(bus_action, c_index, c_tag)
 					
 	# ============================================================================================
 	#							END BUS STUFF
