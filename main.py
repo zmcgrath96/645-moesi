@@ -39,6 +39,7 @@ def main(args):
 	elif '-q' in args[0]:
 		args = args[1:]
 
+	# INIT STUFF
 	pid_0 = 'p0'
 	pid_1 = 'p1'
 	pid_2 = 'p2'
@@ -83,29 +84,23 @@ def main(args):
 				shared = True
 		
 		# have the processor say what action it needs done
-		bus_action = ps[c_pid].execute(io, c_tag, c_index, c_offset, shared)
+		bus_action = ps[c_pid].execute(io, c_tag, c_index, c_offset)
 		## STEP 2: if shared someone has the data and reading
+		## always update our current state first
+		ps[c_pid].change_state_rw(io, c_index, shared, c_tag)
 		# busrd
 		if  bus_action == bus_states['r']:
 			if shared:
 				ps[get_from_pid].change_state_bus(bus_action, c_index, c_tag)
-				ps[c_pid].change_state_rw(io, c_index, shared, c_tag)
-			else:
-				ps[c_pid].change_state_rw(io, c_index, shared, c_tag)
-		#busupgr
-		elif bus_action == bus_states['u']:
-			ps[c_pid].change_state_rw(io, c_index, shared, c_tag)
-			invalidate_all(ps, c_index, c_tag, c_pid)
-		#busrdx
+		#busupgr or busrdx
 		else:
-			for pid in ps:
-				if pid != c_pid:
-					ps[pid].change_state_bus(bus_action, c_index, c_tag)
-				else:
-					ps[c_pid].change_state_rw(io, c_index, False, c_tag)
+			invalidate_all(ps, c_index, c_tag, c_pid)
+					
 	# ============================================================================================
 	#							END BUS STUFF
 	# ============================================================================================
+
+	# PRINT STATS
 	for pid in ps:
 		states = ps[pid].count_states()
 		print('{} {}'.format(pid, states))
@@ -124,8 +119,8 @@ def high_priority(last_pid, last_state, this_pid, this_state):
 	return last_pid, last_state
 
 def invalidate_all(ps, index, tag, exception_pid):
-	for pid, state in get_states(ps, index, tag):
-		if state == 'o' or state == 's' and pid != exception_pid:
+	for pid in ps:
+		if pid != exception_pid:
 			ps[pid].invalidate(index, tag)
 
 if __name__ == '__main__':

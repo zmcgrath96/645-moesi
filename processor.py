@@ -16,7 +16,7 @@ class processor():
         self.dirty_wbs = 0
         self.invalids = [0,0,0,0,0]
         
-    def execute(self, rw, tag, index, offset, shared): ##Focuses on PR and PW, returns bus_action
+    def execute(self, rw, tag, index, offset): ##Focuses on PR and PW, returns bus_action
         ret = None
 
         # check to see if the tag at our index is our tag
@@ -61,11 +61,7 @@ class processor():
             else:
                 # read
                 if rw == 0:
-                    # shared or not
-                    if shared:
-                        ret = bus_states['r']
-                    else:
-                        ret = bus_states['r']
+                    ret = bus_states['r']
                 #write
                 else:
                     ret = bus_states['rx']
@@ -146,7 +142,7 @@ class processor():
 
     def invalidate(self, index, tag):
         if self.cache[index][1] == tag:
-            self.cache[index] = ('i', self.cache[index][1])
+            self.cache[index] = ('i', tag)
 
     def count_states(self):
         ##Counts the total number of each state and puts them on the list
