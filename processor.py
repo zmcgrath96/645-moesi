@@ -3,6 +3,12 @@
 ## Zachary McGrath & Shogun Thomas
 import sys
 
+bus_states = {
+    'r': 'BusRd', 
+    'rx': 'BusRdX',
+    'u': 'BusUpgr'
+}
+
 class processor():
     def __init__(self, id):
         self.cache = [('i', 0) for x in range(512)]
@@ -10,7 +16,7 @@ class processor():
         self.dirty_wbs = 0
         self.invalids = [0,0,0,0,0]
         
-    def execute(self, rw, tag, index, offset): ##Focuses on PR and PW, returns bus_action
+    def execute(self, rw, tag, index, offset, shared): ##Focuses on PR and PW, returns bus_action
         ret = None
 
         # check to see if the tag at our index is our tag
@@ -26,98 +32,128 @@ class processor():
 
             # owner state
             elif 'o' in state:
-                    # if reading, no bus signal needed
+                    # read
                     if rw == 0:
                         ret = None
-                    # if writing, need bus upgrd signal and change state to m
+                    # write
                     else:
-                        ret = 'BusUpgr'
-                        self.cache[index] = ('m', self.cache[index][1])
+                        ret = bus_states['u']
                     
             # exclusive state
             elif 'e' in state:
-                # if reading, no change state needed, no bus signal
+                # read
                 if rw == 0:
                     ret = None
-                # if writing, no bus signal, change to m state
+                # write
                 else:
                     ret = None
-                    self.cache[index] = ('m', self.cache[index][1])
 
             # shared state
             elif 's' in state:
-                # if reading, no state change, no bus signal
+                # read
                 if rw == 0:
                     ret = None
-                #if writing, need to change to m state and bus upgr signal
+                # write
                 else:
-                    ret = 'BusUpgr'
-                    self.cache[index] = ('m', self.cache[index][1])
+                    ret = bus_states['u']
 
             # invalid state
             else:
-                # can only read, should need to know if i'm going to shared or not
-                pass
+                # read
+                if rw == 0:
+                    # shared or not
+                    if shared:
+                        ret = bus_states['r']
+                    else:
+                        ret = bus_states['r']
+                #write
+                else:
+                    ret = bus_states['rx']
 
         # if i don't have it, i need to request it
         else:
-            pass
-        pass
+            ret = bus_states['r']
 
-    def change_state_bus(self, bus_sig, index, address): ##Handles the bus tranactions, DOES THIS NEED THE ADDRESS and if so FOR WHAT
-        state = self.cache[index][0]
-        flush = False
+        return ret
+
+    # changing the state of the executing processor
+    def change_state_rw(self, rw, index, shared, tag):
+        current_state = self.cache[index][0]
+
+        if 'm' in current_state: #Modified current_State (does nothing)
+            return
         
+        elif 'o' in current_state: #Owner current_State (only in write)
+            if rw == 0:
+                return
+            else:
+                self.cache[index] = ('m', tag)
+
+        elif 'e' in current_state: #Exclusive current_state (only in write)
+            if rw == 0:
+                return 
+            else:
+                self.cache[index] = ('m', tag)
+        
+        elif 's' in current_state: #Shared current_State
+            if rw == 0:
+                return 
+            else:
+                self.cache[index] = ('m', tag)
+        
+        else: #Invalid State
+            if rw == 0:
+                if shared:
+                    self.cache[index] = ('s', tag)
+                else:
+                    self.cache[index] = ('e', tag)
+            else:
+                self.cache[index] = ('m', tag)
+                    
+                
+    def change_state_bus(self, bus_sig, index, tag): ##Handles the bus tranactions
+        # If its not the right tag, return so that we don't mess with that
+        if self.cache[index][1] != tag:
+            return
+
+        state = self.cache[index][0]
         if 'm' in state: ##MODIFIED STATE
-            if bus_sig == "BusRd":
-                flush = True
+            if bus_sig == bus_states['r']:
                 self.cache[index] = ('o', self.cache[index][1])
 
-            elif bus_sig == "BusRdX":
-                flush = True
+            elif bus_sig == bus_states['rx']:
                 self.dirty_wbs += 1
                 self.cache[index] = ('i', self.cache[index][1])
 
         elif 'o' in state: ##OWNER CASE
-            if bus_sig == "BusRd":
-                flush = True
-
-            elif bus_sig == "BusRdX":
-                flush = True
+            if bus_sig == bus_states['rx']:
                 self.dirty_wbs += 1
                 self.cache[index] = ('i', self.cache[index][1])
 
-            elif bus_sig == "BusUpgr":
-                flush = False
-                self.dirty_wbs += 1
+            elif bus_sig == bus_states['u']:
                 self.cache[index] = ('i', self.cache[index][1])
         
         elif 'e' in state: ##EXCLUSIVE CASE
-            if bus_sig == "BusRd":
-                flush = True
+            if bus_sig == bus_states['r']:
                 self.cache[index] = ('s', self.cache[index][1])
 
-            elif bus_sig == "BusRdX":
-                flush = True
+            elif bus_sig == bus_states['rx']:
                 self.cache[index] = ('i', self.cache[index][1])
 
         elif 's' in state: ##SHARED CASE
-            if bus_sig == "BusRdX" or bus_sig == "BusUpgr":
-                flush = False
+            if bus_sig == bus_states['rx'] or bus_sig == bus_states['u']:
                 self.cache[index] = ('i', self.cache[index][1])
-        
-        else: ##INVALID CASE
-            ##Has to check if other processors are in S or not
-            pass
-        
-        return flush
+
+    def invalidate(self, index, tag):
+        if self.cache[index][1] == tag:
+            self.cache[index] = ('i', self.cache[index][1])
 
     def count_states(self):
         ##Counts the total number of each state and puts them on the list
         state_list = [0, 0, 0, 0, 0]
 
         for x in self.cache:
-            (s, num) = x
+            (s, _) = x
 
             if s == 'm': ##m state at index 0
                 state_list[0] = state_list[0]+1

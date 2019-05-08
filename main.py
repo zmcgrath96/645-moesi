@@ -6,6 +6,19 @@ INPUT_FOLDER = 'traces/'
 QUICK_FILE_PARAMS = [INPUT_FOLDER + 'p0.tr', INPUT_FOLDER + 'p1.tr', INPUT_FOLDER + 'p2.tr', INPUT_FOLDER + 'p3.tr']
 INTERACTIVE_PARAMS = ['-i'] + QUICK_FILE_PARAMS
 
+bus_states = {
+    'r': 'BusRd', 
+    'rx': 'BusRdX',
+    'u': 'BusUpgr'
+}
+
+p_state_enum = {
+	'o': 1,
+	'm': 2, 
+	's': 3,
+	'e': 4
+}
+
 '''
 Description:
 	intro file into this project
@@ -47,22 +60,55 @@ def main(args):
 	all_traces.sort(key = lambda t: (t[1], t[0]))
 
 	# each cycle has the form (pid, timestamp, read/write(1/0), tag (int), index(int), offset(int))
-	clean_bus = True
+	# ============================================================================================
+	#							BUS STUFF
+	# ============================================================================================
 	for cycle in all_traces:
+		# for debugging
 		if INTERACTIVE:
 			input('Enter for next cycle')
+
+		## STEP ONE: GET PROCESSOR STATES AND CHANGE EXEC PROCESSOR
+		# make it easier to read
 		c_pid, _, io, c_tag, c_index, c_offset = cycle
-		bus_action = ps[c_pid].execute(io, c_tag, c_index, c_offset)
-		states = get_states(ps, c_index, c_tag)
-
+		# get the states of all the processors
 		shared = False
-		for p_id, state in states:
-			if state == 's' and ps[c_pid].state == 'i':
-				ps[c_pid].state = 's'
+		get_from_pid = None
+		get_from_state = None
+		states = get_states(ps, c_index, c_tag)
+		for pid in states:
+			state = states[pid]
+			if state != 'i' and pid != c_pid:
+				get_from_pid, get_from_state = high_priority(get_from_pid, get_from_state, pid, state)
 				shared = True
-
-		if not shared and ps[c_pid] == 'i':
-			ps[c_pid].state = 'e'
+		
+		# have the processor say what action it needs done
+		bus_action = ps[c_pid].execute(io, c_tag, c_index, c_offset, shared)
+		## STEP 2: if shared someone has the data and reading
+		# busrd
+		if  bus_action == bus_states['r']:
+			if shared:
+				ps[get_from_pid].change_state_bus(bus_action, c_index, c_tag)
+				ps[c_pid].change_state_rw(io, c_index, shared, c_tag)
+			else:
+				ps[c_pid].change_state_rw(io, c_index, shared, c_tag)
+		#busupgr
+		elif bus_action == bus_states['u']:
+			ps[c_pid].change_state_rw(io, c_index, shared, c_tag)
+			invalidate_all(ps, c_index, c_tag, c_pid)
+		#busrdx
+		else:
+			for pid in ps:
+				if pid != c_pid:
+					ps[pid].change_state_bus(bus_action, c_index, c_tag)
+				else:
+					ps[c_pid].change_state_rw(io, c_index, False, c_tag)
+	# ============================================================================================
+	#							END BUS STUFF
+	# ============================================================================================
+	for pid in ps:
+		states = ps[pid].count_states()
+		print('{} {}'.format(pid, states))
 
 def get_states(ps, index, tag):
 	states = {}
@@ -70,13 +116,24 @@ def get_states(ps, index, tag):
 		states[p] = ps[p].get_state(index, tag)
 	return states
 
+def high_priority(last_pid, last_state, this_pid, this_state):	
+	if last_pid is None or last_state is None:
+		return this_pid, this_state	
+	if p_state_enum[last_state] < p_state_enum[this_state]:
+		return this_pid, this_state
+	return last_pid, last_state
 
+def invalidate_all(ps, index, tag, exception_pid):
+	for pid, state in get_states(ps, index, tag):
+		if state == 'o' or state == 's' and pid != exception_pid:
+			ps[pid].invalidate(index, tag)
 
 if __name__ == '__main__':
 	if len(sys.argv[1:]) < 4:
 		if len(sys.argv) == 2:
+			if '-q' in sys.argv[1]:
+				INTERACTIVE_PARAMS[0] = '-q'
 			main(INTERACTIVE_PARAMS)
 		else:
 			print('Invalid input. Call to main.py should be of the form:')
 			print('python3 main.py p0_trace p1_trace p2_trace p3_trace')
-	main(sys.argv[1:])
