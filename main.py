@@ -39,7 +39,9 @@ def main(args):
 	elif '-q' in args[0]:
 		args = args[1:]
 
-	# INIT STUFF
+	# ============================================================================================
+	#			 INIT STUFF
+	# ============================================================================================
 	pid_0 = 'p0'
 	pid_1 = 'p1'
 	pid_2 = 'p2'
@@ -82,12 +84,15 @@ def main(args):
 			if state != 'i' and pid != c_pid:
 				get_from_pid, get_from_state = high_priority(get_from_pid, get_from_state, pid, state)
 				shared = True
-		
 		# have the processor say what action it needs done
 		bus_action = ps[c_pid].execute(io, c_tag, c_index, c_offset)
+
 		## STEP 2: if shared someone has the data and reading
 		## always update our current state first
 		ps[c_pid].change_state_rw(io, c_index, shared, c_tag)
+
+		if bus_action is None:
+			continue
 		# busrd
 		if  bus_action == bus_states['r']:
 			if shared:
@@ -109,14 +114,21 @@ def main(args):
 	# PRINT STATS
 	for pid in ps:
 		states = ps[pid].count_states()
-		print('{} {}'.format(pid, states))
+		print('{} \tm: {} \to: {} \te: {} \ts: {} \ti: {}'.format(pid, states[0], states[1], states[2], states[3], states[4]))
+	# end main
 
+# ============================================================================================
+#							HELPER FUNCTIONS
+# ============================================================================================
+#return all the states of the processors in form {pid: state, ...}
 def get_states(ps, index, tag):
 	states = {}
 	for p in ps:
 		states[p] = ps[p].get_state(index, tag)
 	return states
 
+# a 'max' function for the highest priority processor to ask for on a BusRd
+# Owner > Modified > Shared > Exclusive
 def high_priority(last_pid, last_state, this_pid, this_state):	
 	if last_pid is None or last_state is None:
 		return this_pid, this_state	
@@ -124,11 +136,17 @@ def high_priority(last_pid, last_state, this_pid, this_state):
 		return this_pid, this_state
 	return last_pid, last_state
 
+# Invalidate all other processors at that index and tag
+# used by BusRdX and BusUpgr
 def invalidate_all(ps, index, tag, exception_pid):
 	for pid in ps:
 		if pid != exception_pid:
 			ps[pid].invalidate(index, tag)
+# ============================================================================================
+#							END HELPER FUNCTIONS
+# ============================================================================================
 
+# enter the file
 if __name__ == '__main__':
 	if len(sys.argv[1:]) < 4:
 		if len(sys.argv) == 2:

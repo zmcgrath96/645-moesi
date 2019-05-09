@@ -9,6 +9,7 @@ bus_states = {
     'u': 'BusUpgr'
 }
 
+# Class to hold processor cache and states
 class processor():
     def __init__(self, id):
         self.cache = [('i', 0) for x in range(512)]
@@ -16,9 +17,9 @@ class processor():
         self.dirty_wbs = 0
         self.invalids = [0,0,0,0,0]
         
+    # Given a Read or write operation and the state of the that cache value, return the bus action needed
     def execute(self, rw, tag, index, offset): ##Focuses on PR and PW, returns bus_action
         ret = None
-
         # check to see if the tag at our index is our tag
         if self.cache[index][1] == tag:
             # check the state of our cache line
@@ -68,7 +69,12 @@ class processor():
 
         # if i don't have it, i need to request it
         else:
-            ret = bus_states['r']
+             # read
+            if rw == 0:
+                ret = bus_states['r']
+            #write
+            else:
+                ret = bus_states['rx']
 
         return ret
 
@@ -106,44 +112,46 @@ class processor():
             else:
                 self.cache[index] = ('m', tag)
                     
-                
+    # Given a bus signal, change the state of the data at the cache tag and index
     def change_state_bus(self, bus_sig, index, tag): ##Handles the bus tranactions
-        # If its not the right tag, return so that we don't mess with that
+        # If its not the right tag, return so that we don't mess with that data
         if self.cache[index][1] != tag:
             return
 
         state = self.cache[index][0]
         if 'm' in state: ##MODIFIED STATE
             if bus_sig == bus_states['r']:
-                self.cache[index] = ('o', self.cache[index][1])
+                self.cache[index] = ('o', tag)
 
             elif bus_sig == bus_states['rx']:
                 self.dirty_wbs += 1
-                self.cache[index] = ('i', self.cache[index][1])
+                self.cache[index] = ('i', tag)
 
         elif 'o' in state: ##OWNER CASE
             if bus_sig == bus_states['rx']:
                 self.dirty_wbs += 1
-                self.cache[index] = ('i', self.cache[index][1])
+                self.cache[index] = ('i', tag)
 
             elif bus_sig == bus_states['u']:
-                self.cache[index] = ('i', self.cache[index][1])
+                self.cache[index] = ('i', tag)
         
         elif 'e' in state: ##EXCLUSIVE CASE
             if bus_sig == bus_states['r']:
-                self.cache[index] = ('s', self.cache[index][1])
+                self.cache[index] = ('s', tag)
 
             elif bus_sig == bus_states['rx']:
-                self.cache[index] = ('i', self.cache[index][1])
+                self.cache[index] = ('i', tag)
 
         elif 's' in state: ##SHARED CASE
             if bus_sig == bus_states['rx'] or bus_sig == bus_states['u']:
-                self.cache[index] = ('i', self.cache[index][1])
+                self.cache[index] = ('i', tag)
 
+    # Invalidate the data on a call from a busRdX or BusUpgr if the tag there is the right tag
     def invalidate(self, index, tag):
         if self.cache[index][1] == tag:
             self.cache[index] = ('i', tag)
 
+    # used for reporting the number of data in each state
     def count_states(self):
         ##Counts the total number of each state and puts them on the list
         state_list = [0, 0, 0, 0, 0]
@@ -168,6 +176,7 @@ class processor():
 
         return state_list
 
+    # return the
     def get_state(self, index, tag):
         if self.cache[index][1] == tag:
             return self.cache[index][0]
