@@ -19,6 +19,29 @@ p_state_enum = {
 	'e': 4
 }
 
+c2c_transfers = {
+	'p0': {
+		'p1': 0,
+		'p2': 0, 
+		'p3': 0
+	},
+	'p1': {
+		'p0': 0,
+		'p2': 0,
+		'p3': 0
+	},
+	'p2': {
+		'p0': 0,
+		'p1': 0,
+		'p3': 0
+	},
+	'p3': {
+		'p0': 0,
+		'p1': 0,
+		'p2': 0
+	}
+}
+
 '''
 Description:
 	intro file into this project
@@ -46,6 +69,7 @@ def main(args):
 	pid_1 = 'p1'
 	pid_2 = 'p2'
 	pid_3 = 'p3'
+	# get the traces for all processors
 	p0_trace  = parse(str(args[0]), pid_0)
 	p1_trace  = parse(str(args[1]), pid_1)
 	p2_trace  = parse(str(args[2]), pid_2)
@@ -84,6 +108,7 @@ def main(args):
 			if state != 'i' and pid != c_pid:
 				get_from_pid, get_from_state = high_priority(get_from_pid, get_from_state, pid, state)
 				shared = True
+
 		# have the processor say what action it needs done
 		bus_action = ps[c_pid].execute(io, c_tag, c_index, c_offset)
 
@@ -93,15 +118,15 @@ def main(args):
 
 		if bus_action is None:
 			continue
+
+		if shared:
+			c2c_transfers[get_from_pid][c_pid] += 1
 		# busrd
 		if  bus_action == bus_states['r']:
 			if shared:
 				ps[get_from_pid].change_state_bus(bus_action, c_index, c_tag)
-		#busupgr
-		elif bus_action == bus_states['u']:
-			invalidate_all(ps, c_index, c_tag, c_pid)
-			
-		#busrdx
+
+		#busrdx or busupgr
 		else:
 			for pid in ps:
 				if pid != c_pid:
@@ -112,6 +137,22 @@ def main(args):
 	# ============================================================================================
 
 	# PRINT STATS
+	print('Cache to Cache transfers')
+	for pid in ps:
+		print('{} '.format(pid), end='')
+		for p2 in c2c_transfers[pid]:
+			print('\t<{}-{}>: {}'.format(pid, p2, c2c_transfers[pid][p2]), end='')
+		print('')
+		
+	print('\nInvalidation count')
+	for pid in ps:
+		print('{} \tm: {} \to: {} \te: {} \ts: {}'.format(pid, ps[pid].invalids[0], ps[pid].invalids[1], ps[pid].invalids[2], ps[pid].invalids[3]))
+
+	print('\nDirty writeback count')
+	for pid in ps:
+		print('{}  \t{}'.format(pid, ps[pid].dirty_wbs))
+
+	print('\nProcessor states count')
 	for pid in ps:
 		states = ps[pid].count_states()
 		print('{} \tm: {} \to: {} \te: {} \ts: {} \ti: {}'.format(pid, states[0], states[1], states[2], states[3], states[4]))
@@ -136,12 +177,6 @@ def high_priority(last_pid, last_state, this_pid, this_state):
 		return this_pid, this_state
 	return last_pid, last_state
 
-# Invalidate all other processors at that index and tag
-# used by BusRdX and BusUpgr
-def invalidate_all(ps, index, tag, exception_pid):
-	for pid in ps:
-		if pid != exception_pid:
-			ps[pid].invalidate(index, tag)
 # ============================================================================================
 #							END HELPER FUNCTIONS
 # ============================================================================================

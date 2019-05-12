@@ -8,14 +8,13 @@ bus_states = {
     'rx': 'BusRdX',
     'u': 'BusUpgr'
 }
-
 # Class to hold processor cache and states
 class processor():
     def __init__(self, id):
         self.cache = [('i', 0) for x in range(512)]
         self.p_id = id
         self.dirty_wbs = 0
-        self.invalids = [0,0,0,0,0]
+        self.invalids = [0,0,0,0] #MOES
         
     # Given a Read or write operation and the state of the that cache value, return the bus action needed
     def execute(self, rw, tag, index, offset): ##Focuses on PR and PW, returns bus_action
@@ -69,6 +68,9 @@ class processor():
 
         # if i don't have it, i need to request it
         else:
+            that_state = self.cache[index][0]
+            if 'm' in that_state or 'o' in that_state or 'e' in that_state:
+                self.dirty_wbs += 1
              # read
             if rw == 0:
                 ret = bus_states['r']
@@ -126,14 +128,17 @@ class processor():
             elif bus_sig == bus_states['rx']:
                 self.dirty_wbs += 1
                 self.cache[index] = ('i', tag)
+                self.invalids[0] += 1
 
         elif 'o' in state: ##OWNER CASE
             if bus_sig == bus_states['rx']:
                 self.dirty_wbs += 1
                 self.cache[index] = ('i', tag)
+                self.invalids[1] += 1
 
             elif bus_sig == bus_states['u']:
                 self.cache[index] = ('i', tag)
+                self.invalids[1] += 1
         
         elif 'e' in state: ##EXCLUSIVE CASE
             if bus_sig == bus_states['r']:
@@ -141,15 +146,12 @@ class processor():
 
             elif bus_sig == bus_states['rx']:
                 self.cache[index] = ('i', tag)
+                self.invalids[2] += 1
 
         elif 's' in state: ##SHARED CASE
             if bus_sig == bus_states['rx'] or bus_sig == bus_states['u']:
                 self.cache[index] = ('i', tag)
-
-    # Invalidate the data on a call from a busRdX or BusUpgr if the tag there is the right tag
-    def invalidate(self, index, tag):
-        if self.cache[index][1] == tag:
-            self.cache[index] = ('i', tag)
+                self.invalids[3] += 1
 
     # used for reporting the number of data in each state
     def count_states(self):
