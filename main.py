@@ -121,16 +121,11 @@ def main(args):
 
 		if shared:
 			c2c_transfers[get_from_pid][c_pid] += 1
-		# busrd
-		if  bus_action == bus_states['r']:
-			if shared:
-				ps[get_from_pid].change_state_bus(bus_action, c_index, c_tag)
 
-		#busrdx or busupgr
-		else:
-			for pid in ps:
-				if pid != c_pid:
-					ps[pid].change_state_bus(bus_action, c_index, c_tag)
+		# update all of the other processors
+		for pid in ps:
+			if pid != c_pid:
+				ps[pid].change_state_bus(bus_action, c_index, c_tag)
 					
 	# ============================================================================================
 	#							END BUS STUFF
