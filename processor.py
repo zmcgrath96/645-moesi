@@ -41,12 +41,7 @@ class processor():
                     
             # exclusive state
             elif 'e' in state:
-                # read
-                if rw == 0:
-                    ret = None
-                # write
-                else:
-                    ret = None
+                ret = None
 
             # shared state
             elif 's' in state:
@@ -69,7 +64,7 @@ class processor():
         # if i don't have it, i need to request it
         else:
             that_state = self.cache[index][0]
-            if 'm' in that_state or 'o' in that_state or 'e' in that_state:
+            if 'm' in that_state or 'o' in that_state:
                 self.dirty_wbs += 1
              # read
             if rw == 0:
