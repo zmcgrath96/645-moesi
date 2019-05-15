@@ -72,6 +72,8 @@ class processor():
             #write
             else:
                 ret = bus_states['rx']
+            # this is an invalid line now, make it invalid
+            self.cache[index] = ('i', self.cache[index][1])
 
         return ret
 
